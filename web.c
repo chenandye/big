@@ -7,7 +7,7 @@ void static_uri(char *uri, char *fileName);//获取静态页面的uri上的文�
 void static_html(int fd,char *filename);//静态页面处理
 void err_request(int fd,char *cause,char *errnum,char *shortmsg,char *longmsg); //错误http事务
 void dynamic_html(int fd, char *filename, char *cgiargs);//动态处理页面
-void test(int fd);//测试
+void test(int fd);
 
 
 
