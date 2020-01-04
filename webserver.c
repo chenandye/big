@@ -2,12 +2,12 @@
 #define PORT 8080
 #define MAXSIZE 2048
 
-void * process_run(void *v);//服务器运行的主要函数 （改为了指针型，实现多线程时需要使用）
-void static_uri(char *uri, char *fileName);//获取静态页面的uri上的文件名
-void static_html(int fd,char *filename);//静态页面处理
-void wrong_req(int fd,char *msg); //错误http事务
-void dynamic_html(int fd, char *filename, char *cgiargs);//动态处理页面
-void test(int fd);//测试
+void *process_run(void *);//服务器运行的主要函数 （改为了指针型，实现多线程时需要使用）
+void uri_fileName(char *uri, char *fileName);//提取uri上的文件名
+void static_html(int fd,char *fileName);//uri查找静态页面处理
+void dynamic_html_get(int fd, char *fileName, char *query_string);//动态处理页面,加载cgi程序,get方法
+void wrong_req(int fd, char *msg); //错误http事务
+
 
 
 
@@ -15,9 +15,9 @@ int main()
 {
 	int listen_sock,*conn_sock,clientlen;
 	struct sockaddr_in clientaddr;
-	listen_sock = open_listen_sock(PORT);
 	pthread_t pid;
 	clientlen = sizeof(clientaddr);
+	listen_sock = open_listen_sock(PORT);
 	while(1)
 	{
 		conn_sock = malloc(sizeof(int));
@@ -29,36 +29,53 @@ int main()
 		}
 		/* test(conn_sock); */
 		pthread_create(&pid,NULL,process_run,conn_sock);
+		/* process_run(conn_sock); */
 		//多线程的实现
 	}
 }
 
-void test(int fd)
-{
-	char *file = "./index.html";
-	printf("%s\n",file);
-	static_html(fd,file);
-}
 
 
 void wrong_req(int fd,char *msg)
 {
-		char buf[MAXLINE],body[MAXBUF];
-		
-		    /* Build the HTTP response body */
-    sprintf(body, "<html><title>%s</title>",msg);
-    sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
-    sprintf(body, "%s<p>%s\r\n", body,msg);
-    sprintf(body, "%s<hr><em> by cj and yzn</em>\r\n", body);
+	char buf[MAXLINE],body[MAXBUF];
+	char fileName[MAXLINE];
+	char err[MAXLINE];
+	FILE *resource = NULL; 
+	
+	strcpy(err,msg);
+	
+	 if(strcmp(msg,"404")==0)
+	{
+		strcpy(fileName,"./error404.html");
+ 		strcat(err," not found"); 
+	}
+	else if(strcmp(msg,"501")==0)
+	{
+		strcpy(fileName,"./error501.html");
+		strcat(err," error method");
+	}
+	 /*打开 filename 的文件*/  
+    resource = fopen(fileName,"r"); 	
+	
+   	
+     
+        // 写 HTTP header 
+	/*服务器信息*/
+	sprintf(buf, "HTTP/1.0 %s \r\n",err);
+	sprintf(buf, "%ssmall web\r\n",buf);
+	sprintf(buf, "%sContent-Type: text/html\r\n\r\n",buf);
+	send(fd,buf,strlen(buf),0);
 
-    /* send the HTTP response */ 
-    sprintf(buf, "HTTP/1.0 %s\r\n", msg);
-    rio_writen(fd, buf, strlen(buf));
-    sprintf(buf, "Content-type: text/html \r\n");
-    rio_writen(fd, buf, strlen(buf));
-    sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
-    rio_writen(fd, buf, strlen(buf));
-    rio_writen(fd, body, strlen(body));	
+        /*复制文件*/  
+     fgets(buf, sizeof(buf), resource);  
+    while (!feof(resource))  
+    {  
+        send(fd, buf, strlen(buf), 0);  
+        fgets(buf, sizeof(buf), resource);  
+    }  
+    fclose(resource);   
+	
 }
 
 void * process_run(void *v) 
@@ -69,7 +86,6 @@ void * process_run(void *v)
 	free(v);
 	//多线程的实现
 	
-	int dynamic_flag = 0;//动态态页面的标志
 	struct stat sbuf;//用来描述一个linux系统文件系统中的文件属性的结构。
 	/*可以有两种方法来获取一个文件的属性：
 		1、通过路径：
@@ -87,63 +103,66 @@ void * process_run(void *v)
 
 	rio_readinitb(&rio,fd);
 	rio_readlineb(&rio,buf,MAXSIZE);
+	//得到方法，uri，和版本信息
 	sscanf(buf,"%s%s%s",method,uri,version);
-	
+
     rio_readlineb(&rio, buf, MAXSIZE);
     while(strcmp(buf, "\r\n")) {
 	    printf("%s", buf);
 	    rio_readlineb(&rio, buf, MAXSIZE);
     }
+
 	
 	//判断方法，不是GET也不是POST则直接跳出
 	if(strcasecmp(method, "GET") && strcasecmp(method, "POST"))
 	{
 		//错误处理，方法错误 
-		wrong_req(fd,"501 not realized");
+		wrong_req(fd,"501");
 		return NULL;
 	}
-	if(strcasecmp(method, "POST") == 0)
-		dynamic_flag = 1;
-	if(strcasecmp(method, "GET") == 0)
+	else if(strcasecmp(method, "POST") == 0)
 	{
-	
+		uri_fileName(uri, fileName);
+		static_html(fd, fileName);
+	}
+	else if(strcasecmp(method, "GET") == 0)
+	{
+		
 		query_string = uri;
 		//遍历uri，找出是否有?后的条目
 		while((*query_string != '?') && (*query_string != '\0'))
 			query_string++;
 		//uri如果有?
-		
 		if(*query_string == '?')
 		{
-			//动态网页
-			dynamic_flag = 1;
 			*query_string = '\0';
 			query_string++;
-			static_uri(uri,fileName);
-			dynamic_html(fd,fileName,query_string);
+			uri_fileName(uri, fileName);
+			dynamic_html_get(fd,fileName,query_string);
 		}
 		else//静态页面
 		{
- 			static_uri(uri,fileName);
-			 static_html(fd,fileName);
-			
+			uri_fileName(uri, fileName);
+			static_html(fd,fileName);			
 		}
 	}
+	
 		close(fd);
 		return NULL;
 }
-void static_html(int fd,char *filename)
+
+void static_html(int fd,char *fileName)
 {
-	  FILE *resource = NULL;  
+	FILE *resource = NULL;  
     char buf[MAXSIZE]; 
-	int numchars = 1;
 
     /*打开 filename 的文件*/  
-    resource = fopen(filename,"r"); 	
-    if (resource == NULL)  
-       wrong_req(fd,"404 not find"); 
-    else  
-    {  
+    resource = fopen(fileName,"r"); 	
+	if (resource == NULL)
+	{
+		wrong_req(fd, "404");
+		return;
+	}       
         /*写 HTTP header */  
     strcpy(buf, "HTTP/1.0 200 OK\r\n");  
     send(fd, buf, strlen(buf), 0);  
@@ -164,11 +183,10 @@ void static_html(int fd,char *filename)
         fgets(buf, sizeof(buf), resource);  
     }  
     fclose(resource);  
-    }  
 }
 
 
-void static_uri(char *uri, char *fileName)
+void uri_fileName(char *uri, char *fileName)
 {
 	char *p;
 	strcpy(fileName,".");
@@ -180,11 +198,18 @@ void static_uri(char *uri, char *fileName)
 
 
 
-void dynamic_html(int fd, char *filename, char *cgiargs) 
+void dynamic_html_get(int fd, char *fileName, char *query_string) 
 {
     char buf[MAXLINE], *emptylist[] = { NULL };
     int pfd[2];
-
+	FILE *resource = NULL;
+	resource = fopen(fileName, "r");
+	if (resource == NULL)
+	{
+		wrong_req(fd, "404");
+		return;
+	}
+		
     /* Return first part of HTTP response */
     sprintf(buf, "HTTP/1.0 200 OK\r\n");
     rio_writen(fd, buf, strlen(buf));
@@ -193,14 +218,17 @@ void dynamic_html(int fd, char *filename, char *cgiargs)
  
     pipe(pfd);
     if (fork() == 0) {             /* child */
-	close(pfd[1]);
-        dup2(pfd[0],STDIN_FILENO);
-	dup2(fd, STDOUT_FILENO);         /* Redirect stdout to client */
-	execve(filename, emptylist, environ);    /* Run CGI program */
+		close(pfd[1]);
+		dup2(pfd[0],STDIN_FILENO);
+		dup2(fd, STDOUT_FILENO);         /* Redirect stdout to client */
+		execve(fileName, emptylist, environ);    /* Run CGI program */
     }
 
     close(pfd[0]);
-    write(pfd[1], cgiargs, strlen(cgiargs)+1);
+    write(pfd[1], query_string, strlen(query_string)+1);
     wait(NULL);                          /* Parent waits for and reaps child */
     close(pfd[1]);
+	fclose(resource);
 }
+
+
