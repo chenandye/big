@@ -68,7 +68,7 @@ void wrong_req(int fd,char *msg)
 	send(fd,buf,strlen(buf),0);
 
         /*复制文件*/  
-     fgets(buf, sizeof(buf), resource);  
+    fgets(buf, sizeof(buf), resource);  
     while (!feof(resource))  
     {  
         send(fd, buf, strlen(buf), 0);  
@@ -118,6 +118,7 @@ void * process_run(void *v)
 	{
 		//错误处理，方法错误 
 		wrong_req(fd,"501");
+		close(fd);
 		return NULL;
 	}
 	else if(strcasecmp(method, "POST") == 0)
@@ -167,7 +168,7 @@ void static_html(int fd,char *fileName)
     strcpy(buf, "HTTP/1.0 200 OK\r\n");  
     send(fd, buf, strlen(buf), 0);  
     /*服务器信息*/  
-    strcpy(buf,"small web ");  
+    sprintf(buf, "Server: weblet Web Server\r\n");  
     send(fd, buf, strlen(buf), 0);  
     sprintf(buf, "Content-Type: text/html\r\n");  
     send(fd, buf, strlen(buf), 0);  
@@ -176,7 +177,7 @@ void static_html(int fd,char *fileName)
 	
 	
         /*复制文件*/  
-     fgets(buf, sizeof(buf), resource);  
+    fgets(buf, sizeof(buf), resource);  
     while (!feof(resource))  
     {  
         send(fd, buf, strlen(buf), 0);  
