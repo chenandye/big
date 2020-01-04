@@ -6,7 +6,7 @@ int main(void) {
     int n1=0, n2=0;
 
     /* Extract the two arguments from standard input */
-    scanf("n1=%d&n2=%d", &n1, &n2);
+    scanf("%d&%d", &n1, &n2);
     
     /* Make the response body */
     sprintf(content, "Test: ");
