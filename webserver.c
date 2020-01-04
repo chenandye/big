@@ -68,7 +68,7 @@ void wrong_req(int fd,char *msg)
 	send(fd,buf,strlen(buf),0);
 
         /*复制文件*/  
-    fgets(buf, sizeof(buf), resource);  
+     fgets(buf, sizeof(buf), resource);  
     while (!feof(resource))  
     {  
         send(fd, buf, strlen(buf), 0);  
@@ -86,7 +86,7 @@ void * process_run(void *v)
 	free(v);
 	//多线程的实现
 	
-	struct stat sbuf;//用来描述一个linux系统文件系统中的文件属性的结构。
+	//struct stat sbuf;//用来描述一个linux系统文件系统中的文件属性的结构。
 	/*可以有两种方法来获取一个文件的属性：
 		1、通过路径：
 		int stat(const char *path, struct stat *struct_stat);
@@ -98,7 +98,6 @@ void * process_run(void *v)
 	char fileName[MAXSIZE];
 	rio_t rio;
 	char *query_string;
-	char cgiargs[MAXSIZE];
 	
 
 	rio_readinitb(&rio,fd);
@@ -118,7 +117,6 @@ void * process_run(void *v)
 	{
 		//错误处理，方法错误 
 		wrong_req(fd,"501");
-		close(fd);
 		return NULL;
 	}
 	else if(strcasecmp(method, "POST") == 0)
@@ -168,7 +166,7 @@ void static_html(int fd,char *fileName)
     strcpy(buf, "HTTP/1.0 200 OK\r\n");  
     send(fd, buf, strlen(buf), 0);  
     /*服务器信息*/  
-    sprintf(buf, "Server: weblet Web Server\r\n");  
+    strcpy(buf,"small web ");  
     send(fd, buf, strlen(buf), 0);  
     sprintf(buf, "Content-Type: text/html\r\n");  
     send(fd, buf, strlen(buf), 0);  
@@ -177,7 +175,7 @@ void static_html(int fd,char *fileName)
 	
 	
         /*复制文件*/  
-    fgets(buf, sizeof(buf), resource);  
+     fgets(buf, sizeof(buf), resource);  
     while (!feof(resource))  
     {  
         send(fd, buf, strlen(buf), 0);  
@@ -189,7 +187,6 @@ void static_html(int fd,char *fileName)
 
 void uri_fileName(char *uri, char *fileName)
 {
-	char *p;
 	strcpy(fileName,".");
 	strcat(fileName,uri);
 	if(uri[strlen(uri)-1] == '/')
